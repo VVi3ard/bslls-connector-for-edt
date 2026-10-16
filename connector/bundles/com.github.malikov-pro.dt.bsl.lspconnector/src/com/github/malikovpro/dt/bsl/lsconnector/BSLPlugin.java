@@ -252,6 +252,9 @@ public class BSLPlugin extends Plugin {
 
     private void searchConfigurationFile() throws IOException {
 	pathToConfiguration = BSLCommon.getConfigurationFileFromWorkspace(pathToWorkspace);
+	if (pathToConfiguration.isEmpty()) {
+	    pathToConfiguration = BSLCommon.getConfigurationFileFromProjects();
+	}
     }
 
     private void initAppDir() {

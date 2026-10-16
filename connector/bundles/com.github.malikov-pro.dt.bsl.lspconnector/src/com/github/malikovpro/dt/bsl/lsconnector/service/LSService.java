@@ -22,6 +22,7 @@ import com.github.malikovpro.dt.bsl.lsconnector.check.LsRevalidation;
 import com.github.malikovpro.dt.bsl.lsconnector.lsp.BSLConnector;
 import com.github.malikovpro.dt.bsl.lsconnector.lsp.BSLLanguageClient;
 import com.github.malikovpro.dt.bsl.lsconnector.ui.BSLPreferencePage;
+import com.github.malikovpro.dt.bsl.lsconnector.util.BSLCommon;
 import com.github.malikovpro.dt.bsl.lsconnector.util.LaunchMode;
 import com.github.malikovpro.dt.bsl.lsconnector.util.LsCache;
 import com.github.malikovpro.dt.bsl.lsconnector.util.LsVersionProbe;
@@ -241,11 +242,11 @@ public class LSService {
      * Файл перезаписывается только при изменении содержимого.
      */
     private synchronized Path generateConfiguration() throws IOException {
-	var srcRoots = findProjectSrcRoots();
+	var primaryConfigRoot = findPrimaryConfigurationRoot();
 	var json = new StringBuilder();
 	json.append("{\n    \"sendErrors\": \"never\"");
-	if (srcRoots.size() == 1) {
-	    var root = srcRoots.get(0).toAbsolutePath().toString().replace("\\", "\\\\");
+	if (primaryConfigRoot.isPresent()) {
+	    var root = primaryConfigRoot.get().toAbsolutePath().toString().replace("\\", "\\\\");
 	    json.append(",\n    \"configurationRoot\": \"").append(root).append("\"");
 	}
 	json.append("\n}\n");
@@ -257,19 +258,23 @@ public class LSService {
 	return target;
     }
 
-    /** Каталоги src доступных проектов воркспейса (для configurationRoot). */
-    private List<Path> findProjectSrcRoots() {
-	var result = new ArrayList<Path>();
-	for (var project : org.eclipse.core.resources.ResourcesPlugin.getWorkspace().getRoot().getProjects()) {
-	    if (!project.isAccessible() || project.getLocation() == null) {
-		continue;
-	    }
-	    var src = project.getLocation().append("src").toFile().toPath();
-	    if (java.nio.file.Files.isDirectory(src)) {
-		result.add(src);
+    /**
+     * Находит корень исходников (src) основной конфигурации воркспейса.
+     * Сначала ищет проект с файлом Configuration.mdo (основная конфигурация);
+     * если такой проект найден среди доступных 1С-проектов (например, конфигурация + тесты) — берёт его.
+     * Если проектов конфигурации нет, но доступен ровно один проект с src — берёт его.
+     */
+    private Optional<Path> findPrimaryConfigurationRoot() {
+	var projects = BSLCommon.find1CProjects();
+	for (var project : projects) {
+	    if (BSLCommon.isConfigurationProject(project)) {
+		return Optional.of(project.getLocation().append("src").toFile().toPath());
 	    }
 	}
-	return result;
+	if (projects.size() == 1) {
+	    return Optional.of(projects.get(0).getLocation().append("src").toFile().toPath());
+	}
+	return Optional.empty();
     }
 
     private void connectToProcess() {

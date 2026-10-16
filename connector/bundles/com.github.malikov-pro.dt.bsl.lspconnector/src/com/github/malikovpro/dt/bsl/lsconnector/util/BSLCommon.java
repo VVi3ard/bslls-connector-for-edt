@@ -7,11 +7,14 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
+import org.eclipse.core.resources.IProject;
+import org.eclipse.core.resources.ResourcesPlugin;
 import org.eclipse.jface.text.BadLocationException;
 import org.eclipse.jface.text.Document;
 import org.eclipse.lsp4j.Range;
@@ -82,6 +85,62 @@ public final class BSLCommon {
 
     public static URI uri(URI uri) {
 	return Absolute.uri(uri);
+    }
+
+    /**
+     * Возвращает список доступных 1С-проектов воркспейса (содержащих каталог src).
+     */
+    public static List<IProject> find1CProjects() {
+	var result = new ArrayList<IProject>();
+	for (var project : ResourcesPlugin.getWorkspace().getRoot().getProjects()) {
+	    if (!project.isAccessible() || project.getLocation() == null) {
+		continue;
+	    }
+	    var src = project.getLocation().append("src").toFile();
+	    if (src.isDirectory()) {
+		result.add(project);
+	    }
+	}
+	return result;
+    }
+
+    /**
+     * Проверяет, является ли проект основной конфигурацией 1С (содержит Configuration.mdo).
+     */
+    public static boolean isConfigurationProject(IProject project) {
+	if (project == null || !project.isAccessible() || project.getLocation() == null) {
+	    return false;
+	}
+	var mdo = project.getLocation().append("src").append("Configuration").append("Configuration.mdo").toFile();
+	if (mdo.isFile()) {
+	    return true;
+	}
+	var mdoAlt = project.getLocation().append("src").append("Configuration.mdo").toFile();
+	return mdoAlt.isFile();
+    }
+
+    /**
+     * Ищет файл .bsl-language-server.json в корнях доступных 1С-проектов и их родительских каталогах (корень репозитория).
+     */
+    public static Optional<Path> getConfigurationFileFromProjects() {
+	for (var project : find1CProjects()) {
+	    var location = project.getLocation();
+	    if (location == null) {
+		continue;
+	    }
+	    var projectConfig = location.append(".bsl-language-server.json").toFile().toPath();
+	    if (Files.isRegularFile(projectConfig)) {
+		return Optional.of(projectConfig);
+	    }
+	    var parentLocation = location.removeLastSegments(1);
+	    if (parentLocation != null) {
+		var parentConfig = parentLocation.append(".bsl-language-server.json").toFile().toPath();
+		if (Files.isRegularFile(parentConfig)) {
+		    return Optional.of(parentConfig);
+		}
+	    }
+	}
+	return Optional.empty();
     }
 
 }
