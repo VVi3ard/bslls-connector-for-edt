@@ -260,12 +260,23 @@ public class LSService {
 
     /**
      * Находит корень исходников (src) основной конфигурации воркспейса.
-     * Сначала ищет проект с файлом Configuration.mdo (основная конфигурация);
+     * Если в настройках явно выбран основной проект (PRIMARY_PROJECT) — берёт его.
+     * Иначе ищет проект с файлом Configuration.mdo (основная конфигурация);
      * если такой проект найден среди доступных 1С-проектов (например, конфигурация + тесты) — берёт его.
      * Если проектов конфигурации нет, но доступен ровно один проект с src — берёт его.
      */
     private Optional<Path> findPrimaryConfigurationRoot() {
 	var projects = BSLCommon.find1CProjects();
+	var selectedProjectName = preferenceStore != null
+		? preferenceStore.getString(BSLPreferencePage.PRIMARY_PROJECT)
+		: "";
+	if (selectedProjectName != null && !selectedProjectName.isEmpty()) {
+	    for (var project : projects) {
+		if (project.getName().equals(selectedProjectName)) {
+		    return Optional.of(project.getLocation().append("src").toFile().toPath());
+		}
+	    }
+	}
 	for (var project : projects) {
 	    if (BSLCommon.isConfigurationProject(project)) {
 		return Optional.of(project.getLocation().append("src").toFile().toPath());

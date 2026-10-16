@@ -121,23 +121,48 @@ public final class BSLCommon {
 
     /**
      * Ищет файл .bsl-language-server.json в корнях доступных 1С-проектов и их родительских каталогах (корень репозитория).
+     * При указании preferredProjectName проект с этим именем проверяется в первую очередь.
      */
-    public static Optional<Path> getConfigurationFileFromProjects() {
-	for (var project : find1CProjects()) {
-	    var location = project.getLocation();
-	    if (location == null) {
-		continue;
-	    }
-	    var projectConfig = location.append(".bsl-language-server.json").toFile().toPath();
-	    if (Files.isRegularFile(projectConfig)) {
-		return Optional.of(projectConfig);
-	    }
-	    var parentLocation = location.removeLastSegments(1);
-	    if (parentLocation != null) {
-		var parentConfig = parentLocation.append(".bsl-language-server.json").toFile().toPath();
-		if (Files.isRegularFile(parentConfig)) {
-		    return Optional.of(parentConfig);
+    public static Optional<Path> getConfigurationFileFromProjects(String preferredProjectName) {
+	var projects = find1CProjects();
+	if (preferredProjectName != null && !preferredProjectName.isEmpty()) {
+	    for (var project : projects) {
+		if (project.getName().equals(preferredProjectName)) {
+		    var config = findConfigFileInProject(project);
+		    if (config.isPresent()) {
+			return config;
+		    }
+		    break;
 		}
+	    }
+	}
+	for (var project : projects) {
+	    var config = findConfigFileInProject(project);
+	    if (config.isPresent()) {
+		return config;
+	    }
+	}
+	return Optional.empty();
+    }
+
+    public static Optional<Path> getConfigurationFileFromProjects() {
+	return getConfigurationFileFromProjects(null);
+    }
+
+    private static Optional<Path> findConfigFileInProject(IProject project) {
+	var location = project.getLocation();
+	if (location == null) {
+	    return Optional.empty();
+	}
+	var projectConfig = location.append(".bsl-language-server.json").toFile().toPath();
+	if (Files.isRegularFile(projectConfig)) {
+	    return Optional.of(projectConfig);
+	}
+	var parentLocation = location.removeLastSegments(1);
+	if (parentLocation != null) {
+	    var parentConfig = parentLocation.append(".bsl-language-server.json").toFile().toPath();
+	    if (Files.isRegularFile(parentConfig)) {
+		return Optional.of(parentConfig);
 	    }
 	}
 	return Optional.empty();

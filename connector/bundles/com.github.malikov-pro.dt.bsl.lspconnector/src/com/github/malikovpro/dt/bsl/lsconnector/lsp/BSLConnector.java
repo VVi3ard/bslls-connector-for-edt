@@ -38,6 +38,7 @@ import org.eclipse.lsp4j.launch.LSPLauncher;
 import org.eclipse.lsp4j.services.LanguageServer;
 
 import com.github.malikovpro.dt.bsl.lsconnector.BSLPlugin;
+import com.github.malikovpro.dt.bsl.lsconnector.ui.BSLPreferencePage;
 import com.github.malikovpro.dt.bsl.lsconnector.util.BSLCommon;
 
 public class BSLConnector {
@@ -94,7 +95,18 @@ public class BSLConnector {
     public CompletableFuture<InitializeResult> initialize() {
 	var projects = BSLCommon.find1CProjects();
 	var workspaceFolders = new ArrayList<WorkspaceFolder>();
+	var store = BSLPlugin.getPlugin() != null ? BSLPlugin.getPlugin().getPreferenceStore() : null;
+	var selectedProjectName = store != null ? store.getString(BSLPreferencePage.PRIMARY_PROJECT) : "";
 	IProject primaryProject = null;
+
+	if (selectedProjectName != null && !selectedProjectName.isEmpty()) {
+	    for (var project : projects) {
+		if (project.getName().equals(selectedProjectName)) {
+		    primaryProject = project;
+		    break;
+		}
+	    }
+	}
 
 	for (var project : projects) {
 	    var uri = BSLCommon.uri(project.getLocation().toFile().toURI());
