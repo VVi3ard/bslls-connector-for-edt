@@ -52,6 +52,7 @@ public class BSLPreferencePage extends PreferencePage implements IWorkbenchPrefe
     private Button jarRadio;
     private Button enabledButton;
     private Combo projectCombo;
+    private Label configFileLabel;
     private Composite jarComposite;
     private Composite cacheComposite;
     private Text javaCommandText;
@@ -106,6 +107,18 @@ public class BSLPreferencePage extends PreferencePage implements IWorkbenchPrefe
 	createLabel(projectGroup, "Проект:");
 	projectCombo = new Combo(projectGroup, SWT.READ_ONLY);
 	projectCombo.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
+	projectCombo.addSelectionListener(new SelectionAdapter() {
+	    @Override
+	    public void widgetSelected(SelectionEvent e) {
+		updateConfigFileDisplay();
+	    }
+	});
+
+	createLabel(projectGroup, "Конфиг BSL LS:");
+	configFileLabel = new Label(projectGroup, SWT.WRAP);
+	var configData = new GridData(SWT.FILL, SWT.CENTER, true, false);
+	configData.widthHint = 420;
+	configFileLabel.setLayoutData(configData);
 
 	var projectHint = new Label(projectGroup, SWT.WRAP);
 	projectHint.setText("Основной проект конфигурации для вычисления configurationRoot и корня рабочей области."
@@ -283,6 +296,7 @@ public class BSLPreferencePage extends PreferencePage implements IWorkbenchPrefe
 	enabledButton.setSelection(true);
 	if (projectCombo != null && !projectCombo.isDisposed()) {
 	    projectCombo.select(0);
+	    updateConfigFileDisplay();
 	}
 	nativeRadio.setSelection(false);
 	jarRadio.setSelection(true);
@@ -342,6 +356,24 @@ public class BSLPreferencePage extends PreferencePage implements IWorkbenchPrefe
 	    }
 	}
 	projectCombo.select(selectIndex);
+	updateConfigFileDisplay();
+    }
+
+    private void updateConfigFileDisplay() {
+	if (configFileLabel == null || configFileLabel.isDisposed()) {
+	    return;
+	}
+	var index = projectCombo != null ? projectCombo.getSelectionIndex() : 0;
+	var preferred = index > 0 ? projectCombo.getItem(index) : "";
+	var ws = BSLPlugin.getPlugin() != null ? BSLPlugin.getPlugin().getPathToWorkspace() : null;
+	var config = BSLCommon.getConfigurationFile(preferred, ws);
+	if (config.isPresent()) {
+	    configFileLabel.setText(config.get().toString());
+	    configFileLabel.setToolTipText(config.get().toString());
+	} else {
+	    configFileLabel.setText("не найден (будет сгенерирован)");
+	    configFileLabel.setToolTipText("");
+	}
     }
 
     /** Читает таймаут initialize из хранилища; мусор и нуль/отрицательные дают умолчание. */

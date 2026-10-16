@@ -257,11 +257,8 @@ public class BSLPlugin extends Plugin {
     }
 
     private void searchConfigurationFile() throws IOException {
-	pathToConfiguration = BSLCommon.getConfigurationFileFromWorkspace(pathToWorkspace);
-	if (pathToConfiguration.isEmpty()) {
-	    var preferred = preferenceStore != null ? preferenceStore.getString(BSLPreferencePage.PRIMARY_PROJECT) : "";
-	    pathToConfiguration = BSLCommon.getConfigurationFileFromProjects(preferred);
-	}
+	var preferred = preferenceStore != null ? preferenceStore.getString(BSLPreferencePage.PRIMARY_PROJECT) : "";
+	pathToConfiguration = BSLCommon.getConfigurationFile(preferred, pathToWorkspace);
     }
 
     private void initAppDir() {

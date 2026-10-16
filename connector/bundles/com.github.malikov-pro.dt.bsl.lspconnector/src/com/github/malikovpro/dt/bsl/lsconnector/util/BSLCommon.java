@@ -120,33 +120,72 @@ public final class BSLCommon {
     }
 
     /**
-     * Ищет файл .bsl-language-server.json в корнях доступных 1С-проектов и их родительских каталогах (корень репозитория).
-     * При указании preferredProjectName проект с этим именем проверяется в первую очередь.
+     * Находит основной проект конфигурации:
+     * 1. Если задано preferredProjectName (не пусто и не "(Авто)") — ищет проект с таким именем среди 1С-проектов.
+     * 2. Иначе ищет проект, содержащий Configuration.mdo (основная конфигурация 1С).
+     * 3. Иначе берет первый доступный 1С-проект с каталогом src.
      */
-    public static Optional<Path> getConfigurationFileFromProjects(String preferredProjectName) {
+    public static Optional<IProject> findPrimaryProject(String preferredProjectName) {
 	var projects = find1CProjects();
-	if (preferredProjectName != null && !preferredProjectName.isEmpty()) {
+	if (preferredProjectName != null && !preferredProjectName.isEmpty() && !"(Авто)".equals(preferredProjectName)) {
 	    for (var project : projects) {
 		if (project.getName().equals(preferredProjectName)) {
-		    var config = findConfigFileInProject(project);
-		    if (config.isPresent()) {
-			return config;
-		    }
-		    break;
+		    return Optional.of(project);
 		}
 	    }
 	}
 	for (var project : projects) {
+	    if (isConfigurationProject(project)) {
+		return Optional.of(project);
+	    }
+	}
+	if (!projects.isEmpty()) {
+	    return Optional.of(projects.get(0));
+	}
+	return Optional.empty();
+    }
+
+    /**
+     * Ищет файл конфигурации .bsl-language-server.json:
+     * 1. В основном проекте (выбранном явно или определенном автоматически по Configuration.mdo) и его родителях (Git-корень).
+     * 2. В остальных 1С-проектах воркспейса и их родителях.
+     * 3. В корне воркспейса Eclipse (запасной вариант, только если в проектах файл не найден).
+     */
+    public static Optional<Path> getConfigurationFile(String preferredProjectName, Path pathToWorkspace) {
+	var primary = findPrimaryProject(preferredProjectName);
+	if (primary.isPresent()) {
+	    var config = findConfigFileInProject(primary.get());
+	    if (config.isPresent()) {
+		return config;
+	    }
+	}
+
+	for (var project : find1CProjects()) {
+	    if (primary.isPresent() && project.equals(primary.get())) {
+		continue;
+	    }
 	    var config = findConfigFileInProject(project);
 	    if (config.isPresent()) {
 		return config;
 	    }
 	}
+
+	if (pathToWorkspace != null) {
+	    var wsConfig = pathToWorkspace.resolve(".bsl-language-server.json");
+	    if (Files.isRegularFile(wsConfig)) {
+		return Optional.of(wsConfig);
+	    }
+	}
+
 	return Optional.empty();
     }
 
+    public static Optional<Path> getConfigurationFileFromProjects(String preferredProjectName) {
+	return getConfigurationFile(preferredProjectName, null);
+    }
+
     public static Optional<Path> getConfigurationFileFromProjects() {
-	return getConfigurationFileFromProjects(null);
+	return getConfigurationFile(null, null);
     }
 
     private static Optional<Path> findConfigFileInProject(IProject project) {
@@ -154,16 +193,16 @@ public final class BSLCommon {
 	if (location == null) {
 	    return Optional.empty();
 	}
-	var projectConfig = location.append(".bsl-language-server.json").toFile().toPath();
-	if (Files.isRegularFile(projectConfig)) {
-	    return Optional.of(projectConfig);
-	}
-	var parentLocation = location.removeLastSegments(1);
-	if (parentLocation != null) {
-	    var parentConfig = parentLocation.append(".bsl-language-server.json").toFile().toPath();
-	    if (Files.isRegularFile(parentConfig)) {
-		return Optional.of(parentConfig);
+	var current = location.toFile().toPath();
+	for (var i = 0; i < 4 && current != null; i++) {
+	    var candidate = current.resolve(".bsl-language-server.json");
+	    if (Files.isRegularFile(candidate)) {
+		return Optional.of(candidate);
 	    }
+	    if (Files.isDirectory(current.resolve(".git"))) {
+		break;
+	    }
+	    current = current.getParent();
 	}
 	return Optional.empty();
     }

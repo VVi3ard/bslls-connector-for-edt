@@ -97,27 +97,11 @@ public class BSLConnector {
 	var workspaceFolders = new ArrayList<WorkspaceFolder>();
 	var store = BSLPlugin.getPlugin() != null ? BSLPlugin.getPlugin().getPreferenceStore() : null;
 	var selectedProjectName = store != null ? store.getString(BSLPreferencePage.PRIMARY_PROJECT) : "";
-	IProject primaryProject = null;
-
-	if (selectedProjectName != null && !selectedProjectName.isEmpty()) {
-	    for (var project : projects) {
-		if (project.getName().equals(selectedProjectName)) {
-		    primaryProject = project;
-		    break;
-		}
-	    }
-	}
+	var primaryProject = BSLCommon.findPrimaryProject(selectedProjectName).orElse(null);
 
 	for (var project : projects) {
 	    var uri = BSLCommon.uri(project.getLocation().toFile().toURI());
 	    workspaceFolders.add(new WorkspaceFolder(uri.toString(), project.getName()));
-	    if (primaryProject == null && BSLCommon.isConfigurationProject(project)) {
-		primaryProject = project;
-	    }
-	}
-
-	if (primaryProject == null && !projects.isEmpty()) {
-	    primaryProject = projects.get(0);
 	}
 
 	var rootUri = primaryProject != null
